@@ -1,2 +1,72 @@
 # pokeblue
-Pokemon Blue Recompilation using gb-recompiled
+
+Static recompilation of Pokemon Blue into portable C, built with
+[GB-Recomp/gb-recompiled](https://github.com/GB-Recomp/gb-recompiled).
+
+This repo ships pre-generated C sources so it builds out of the box —
+you don't need an asm toolchain or the pret/pokeblue decompilation just
+to play.
+
+## Build
+
+You need a C/C++ compiler, CMake 3.16+, SDL2, libcurl, and OpenGL ES 2.
+CMake fetches `gb-recompiled` automatically (no manual setup).
+
+```sh
+mkdir build && cd build
+cmake ..
+cmake --build . -j$(nproc)
+```
+
+This produces a `pokeblue` executable.
+
+## Run
+
+The runtime needs a ROM the first time it boots (it extracts assets into
+`assets/pokeblue/` and then runs from there on subsequent launches).
+
+Drop a Pokemon Blue ROM at `roms/pokeblue.gb` next to the executable:
+
+```sh
+mkdir -p roms
+cp /path/to/pokeblue.gb roms/pokeblue.gb
+./pokeblue
+```
+
+The launcher auto-starts when only one game is registered, so you go
+straight into Red. Battery RAM saves to `pokeblue.sav` next to the
+binary. Press Esc in-game for the settings menu (palette, audio,
+savestates, **Restart Game**, etc.).
+
+## Regenerating the C sources
+
+If you want to rebuild the C from scratch — bump `gb-recompiled`, pick
+up a recompiler change, or tweak the analyzer — run:
+
+```sh
+tools/regen.sh /path/to/pret/pokeblue /path/to/gb-recompiled
+```
+
+That re-builds the ROM via the pret toolchain (requires `rgbds`), then
+invokes `gbrecomp` with the same flags the compilation uses, and copies
+the freshly generated `pokeblue_*.c` files into this repo. Verify with
+`cmake --build .` and commit.
+
+## In a compilation
+
+If you're building a multi-cart compilation that wants to include Red,
+add this repo via `FetchContent` in your top-level CMakeLists:
+
+```cmake
+FetchContent_Declare(pokeblue
+    GIT_REPOSITORY https://github.com/GB-Recomp/pokeblue.git
+    GIT_TAG main
+)
+FetchContent_MakeAvailable(pokeblue)
+# Now link the `pokeblue_cart` target into your launcher executable
+# and call pokeblue_main(argc, argv) from your launcher's g_games[].
+```
+
+The standalone `pokeblue` executable is only built when this repo is the
+top-level project, so consuming it as a subdir doesn't produce a
+conflicting executable target.
