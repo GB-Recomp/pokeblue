@@ -4,6 +4,7 @@
 #define SDL_MAIN_HANDLED
 extern "C" {
 #include "pokeblue.h"
+#include "gb_sha256.h"
 }
 
 #include <SDL.h>
@@ -27,14 +28,23 @@ typedef struct {
     const char* title;
     const char* rom_path;
     GBLauncherMainFn main_fn;
+    /* Lowercase 64-char SHA-256 of the ROM revision the static
+     * recompilation was built against. NULL skips the check. */
+    const char* expected_sha256;
 } GBLauncherGame;
 
 static int launch_pokeblue(int argc, char* argv[]) {
     return pokeblue_main(argc, argv);
 }
 
+/* SHA-256 of the canonical pokeblue.gb the static
+ * recompilation was built against. */
+static const char POKEBLUE_EXPECTED_SHA256[] =
+    "2a951313c2640e8c2cb21f25d1db019ae6245d9c7121f754fa61afd7bee6452d";
+
 static GBLauncherGame g_games[] = {
-    {"pokeblue", "Pokemon Blue", "roms/pokeblue.gb", launch_pokeblue},
+    {"pokeblue", "Pokemon Blue", "roms/pokeblue.gb", launch_pokeblue,
+     POKEBLUE_EXPECTED_SHA256},
 };
 
 static const char* g_launcher_name = "pokeblue";
@@ -429,6 +439,14 @@ int main(int argc, char* argv[]) {
         }
 
         fprintf(stderr, "[LAUNCH] Starting %s [%s]\n", selected->title, selected->id);
+        /* Hash-verify the ROM matches the build the cart was
+         * compiled against. Mismatch is a warning, not fatal --
+         * the asset loader still gates on its own checks. */
+        if (selected->expected_sha256 && selected->rom_path) {
+            gb_sha256_verify_file(selected->rom_path,
+                                  selected->expected_sha256,
+                                  selected->rom_path);
+        }
         /* In single-game mode there's no launcher to return to, so hide
          * the in-game "Return to Launcher" Esc-menu entry (the menu shows
          * "Restart Game" in its place — handled below by the consume call). */
